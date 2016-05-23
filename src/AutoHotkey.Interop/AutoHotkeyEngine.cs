@@ -1,11 +1,7 @@
 ﻿using AutoHotkey.Interop.Util;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AutoHotkey.Interop
 {
@@ -14,11 +10,27 @@ namespace AutoHotkey.Interop
     /// </summary>
     public class AutoHotkeyEngine
     {
-        public AutoHotkeyEngine() {
+        IReadOnlyList<string> _directives;
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="directives">The #directives to pass to AHK DLL on initialization.</param>
+        public AutoHotkeyEngine(IReadOnlyList<string> directives = default(IReadOnlyList<string>)) {
+            _directives = directives;
+
             using(new CurrentDirectorySaver()) {
-                Util.AutoHotkeyDllLoader.EnsureDllIsLoaded();
-                AutoHotkeyDll.ahktextdll("", "", "");
+                AutoHotkeyDllLoader.EnsureDllIsLoaded();
+                InitializeAhkThread();
             }
+        }
+
+        /// <summary>
+        /// Initialize the AHK Thread.
+        /// </summary>
+        void InitializeAhkThread()
+        {
+            AutoHotkeyDll.ahktextdll(_directives == null ? String.Empty : String.Join("\n", _directives), String.Empty, String.Empty);
         }
 
         /// <summary>
@@ -74,6 +86,19 @@ namespace AutoHotkey.Interop
         }
 
         /// <summary>
+        /// Add the given script code to the currently running script.
+        /// </summary>
+        /// <param name="script">The script code to add.</param>
+        /// <param name="run">A flag indicating whether or not to run the code when adding it.</param>
+        public void AddScript(string script, bool run = false)
+        {
+            using (new CurrentDirectorySaver())
+            {
+                AutoHotkeyDll.addScript(script, run ? AutoHotkeyDll.Execute.Run : AutoHotkeyDll.Execute.Add);
+            }
+        }
+
+        /// <summary>
         /// Executes raw ahk code.
         /// </summary>
         /// <param name="code">The code to execute</param>
@@ -94,11 +119,14 @@ namespace AutoHotkey.Interop
             }
         }
 
+        /// <summary>
+        /// Reset the current AHK DLL session.
+        /// </summary>
         public void Reset() {
             using (new CurrentDirectorySaver()) {
                 Terminate();
                 AutoHotkeyDll.ahkReload();
-                AutoHotkeyDll.ahktextdll("", "", "");
+                InitializeAhkThread();
             }
         }
 
